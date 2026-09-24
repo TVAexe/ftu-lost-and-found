@@ -60,7 +60,6 @@ export default function Login() {
         <p className="text-gray-500 mb-8 text-sm">
           Sử dụng email sinh viên (<b>@ftu.edu.vn</b>) để đăng tin đồ thất lạc.
           <br/>
-          <span className="text-red-500 text-xs italic">*(Đang ở chế độ DEV: Chấp nhận mọi email)*</span>
         </p>
         <button onClick={handleGoogleLogin} className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-md py-3 px-4 text-gray-700 font-semibold hover:bg-gray-50 transition shadow-sm">
           <svg className="w-5 h-5" viewBox="0 0 24 24">

@@ -12,6 +12,8 @@ import Home from "./pages/Home";
 import ItemDetail from "./pages/ItemDetail";
 import Login from "./pages/Login";
 import Search from "./pages/Search";
+import MyPosts from "./pages/MyPosts";
+import Inbox from "./pages/Inbox";
 
 function App() {
   const navigate = useNavigate();
@@ -72,6 +74,18 @@ function App() {
             >
               Tìm kiếm
             </Link>
+            <Link
+              to="/bai-dang-cua-toi"
+              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition lg:block ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+            >
+              Bài đăng của tôi
+            </Link>
+            <Link
+              to="/inbox"
+              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+            >
+              Tin nhắn
+            </Link>
 
             {/* Nút Đăng tin (Chỉ nổi bật) */}
             <Link
@@ -130,6 +144,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/item/:id" element={<ItemDetail />} />
           <Route path="/tim-kiem" element={<Search />} />
+          <Route path="/bai-dang-cua-toi" element={<MyPosts />} />
+          <Route element={<Inbox />} path="/inbox" />
           <Route path="/dang-tin" element={<CreateItem />} />
           <Route path="/login" element={<Login />} />
         </Routes>
