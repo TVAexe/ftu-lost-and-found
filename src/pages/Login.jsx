@@ -1,42 +1,66 @@
+/* eslint-disable no-unused-vars */
 import { useEffect } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { usePopup } from '../components/PopupProvider'; // Nếu bạn có dùng thông báo
 
 export default function Login() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup(); // Tùy chọn hiển thị thông báo lỗi
+
+  // Hàm xử lý lưu thông tin user vào bảng users
+  const saveUserToDatabase = async (session) => {
+    if (!session || !session.user) return;
+
+    const userEmail = session.user.email;
+    const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || userEmail.split('@')[0];
+
+    const { error } = await supabase
+      .from('users')
+      .upsert({ 
+        email: userEmail, 
+        full_name: fullName,
+      }, { 
+        onConflict: 'email', 
+        ignoreDuplicates: false 
+      });
+
+    if (error) console.error("Lỗi khi lưu thông tin user: ", error);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        // [CHẾ ĐỘ DEV]: Tạm thời bỏ kiểm tra đuôi email lúc mở app
+        
+        // --- LOGIC CHẶN EMAIL FTU (SẴN SÀNG LIVE) ---
         /*
-        if (session.user.email.endsWith('@ftu.edu.vn')) {
-           navigate('/');
-        } else {
-           supabase.auth.signOut();
+        if (!session.user.email.endsWith('@ftu.edu.vn')) {
+          supabase.auth.signOut();
+          alert("Truy cập bị từ chối! Vui lòng sử dụng email sinh viên (@ftu.edu.vn).");
+          // Hoặc dùng showPopup("Vui lòng sử dụng email @ftu.edu.vn", "error");
+          return;
         }
         */
-       
-        // Cho phép mọi session vào thẳng trang chủ
+
+        saveUserToDatabase(session);
         navigate('/');
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // const userEmail = session.user.email;
         
-        // [CHẾ ĐỘ DEV]: Tạm thời bỏ kiểm tra email FTU khi vừa login xong
+        // --- LOGIC CHẶN EMAIL FTU KHI VỪA ĐĂNG NHẬP XONG ---
         /*
-        if (userEmail.endsWith('@ftu.edu.vn')) {
-          navigate('/');
-        } else {
+        if (!session.user.email.endsWith('@ftu.edu.vn')) {
           await supabase.auth.signOut();
-          navigate('/access-denied');
+          alert("Truy cập bị từ chối! Vui lòng sử dụng email sinh viên (@ftu.edu.vn).");
+          // navigate('/access-denied'); // Nếu bạn có trang báo lỗi riêng
+          return;
         }
         */
-       
-        // Cho phép mọi email Google đăng nhập thành công
+
+        await saveUserToDatabase(session);
         navigate('/');
       }
     });
@@ -47,7 +71,7 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google', 
-      options: { redirectTo: window.location.origin }
+      options: { redirectTo: window.location.origin + '/login' }
     });
     if (error) console.error("Lỗi đăng nhập: ", error);
   };
