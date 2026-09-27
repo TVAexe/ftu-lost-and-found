@@ -21,7 +21,9 @@ export default function Home() {
     let query = supabase
       .from("items")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .eq('approval_status', 'approved') // Chỉ hiện bài đã duyệt
+      .neq('status', 'Đã trao trả') // Ẩn các bài đã trao trả[cite: 3, 4];
 
     if (filter !== "Tất cả") {
       query = query.eq("type", filter);

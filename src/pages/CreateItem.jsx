@@ -11,11 +11,14 @@ export default function CreateItem() {
 
   // State lưu thông tin người dùng
   const [userEmail, setUserEmail] = useState("");
-  const [userName, setUserName] = useState(""); // Thêm state lưu tên
+  const [userName, setUserName] = useState("");
 
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [customCategory, setCustomCategory] = useState("");
+
+  // Thêm state lưu hiện trạng đồ nhặt được
+  const [foundStatus, setFoundStatus] = useState("Người nhặt đang giữ");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -32,7 +35,6 @@ export default function CreateItem() {
       if (session) {
         setUserEmail(session.user.email);
 
-        // Lấy tên thật từ metadata của Google, nếu không có thì để rỗng
         const fullName =
           session.user.user_metadata?.full_name ||
           session.user.user_metadata?.name ||
@@ -88,21 +90,25 @@ export default function CreateItem() {
     const category =
       formData.category === "Khác" ? customCategory.trim() : formData.category;
 
-    // 3. Đẩy toàn bộ dữ liệu vào Database (Bao gồm cả author_name)
+    // 3. Xử lý trạng thái dựa trên phân nhánh
+    const finalStatus = formData.type === "Bị mất" ? "Thất lạc" : foundStatus;
+
+    // 4. Đẩy toàn bộ dữ liệu vào Database
     const { error } = await supabase.from("items").insert([
       {
         ...formData,
         category,
         image_url: urlData.publicUrl,
         user_email: userEmail,
-        author_name: userName, // <--- LƯU TÊN NGƯỜI ĐĂNG Ở ĐÂY
-        status: "Đang tìm",
+        author_name: userName,
+        status: finalStatus,
+        approval_status: "pending", // Đưa vào hàng đợi để admin duyệt
       },
     ]);
 
     setLoading(false);
     if (!error) {
-      showPopup("Đăng tin thành công!", "success");
+      showPopup("Đăng tin thành công! Vui lòng chờ kiểm duyệt.", "success");
       navigate("/");
     } else {
       showPopup("Lỗi: " + error.message, "error");
@@ -219,6 +225,23 @@ export default function CreateItem() {
               )}
             </div>
           </div>
+
+          {/* Logic phân nhánh hiện trạng khi chọn "Nhặt được" */}
+          {formData.type === "Nhặt được" && (
+            <div className="bg-orange-50 border border-orange-100 rounded-md p-3">
+              <label className="block text-sm font-bold text-orange-800 mb-2">
+                Hiện trạng món đồ *
+              </label>
+              <select
+                value={foundStatus}
+                onChange={(e) => setFoundStatus(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2 outline-none focus:border-orange-500 bg-white text-sm"
+              >
+                <option value="Người nhặt đang giữ">Tôi đang tự giữ món đồ này</option>
+                <option value="Đang lưu tại L&F">Tôi đã gửi lại văn phòng L&F</option>
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

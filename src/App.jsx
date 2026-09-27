@@ -14,22 +14,56 @@ import Login from "./pages/Login";
 import Search from "./pages/Search";
 import MyPosts from "./pages/MyPosts";
 import Inbox from "./pages/Inbox";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminPosts from "./pages/admin/AdminPost";
+import AdminItems from "./pages/admin/AdminItem";
+import AdminInbox from "./pages/admin/AdminInbox";
+import AdminStats from "./pages/admin/AdminStat";
+import AccessDenied from "./pages/AccessDenied";
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  const loadAdminStatus = async (nextSession) => {
+    if (!nextSession?.user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const userRole =
+      nextSession.user.app_metadata?.role ||
+      nextSession.user.user_metadata?.role;
+
+    if (userRole === "admin") {
+      setIsAdmin(true);
+      return;
+    }
+
+    const { data } = await supabase
+      .from("users")
+      .select("role")
+      .eq("email", nextSession.user.email)
+      .maybeSingle();
+
+    setIsAdmin(data?.role === "admin");
+  };
 
   // Lắng nghe trạng thái đăng nhập
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      loadAdminStatus(session);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      loadAdminStatus(session);
     });
 
     return () => subscription.unsubscribe();
@@ -48,95 +82,106 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f8fa] font-sans text-slate-800">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex h-[4.5rem] max-w-6xl items-center justify-between gap-4 px-4">
-          {/* Logo */}
-          <Link to="/" className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8f171d] text-lg font-bold text-white shadow-sm">
-              F
-            </div>
-            <span className="truncate text-base font-bold tracking-tight text-[#8f171d] sm:text-lg">
-              FTU Lost & Found
-            </span>
-          </Link>
-
-          {/* Navigation */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link
-              to="/"
-              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
-            >
-              Trang chủ
-            </Link>
-            <Link
-              to="/tim-kiem"
-              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/tim-kiem" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
-            >
-              Tìm kiếm
-            </Link>
-            <Link
-              to="/bai-dang-cua-toi"
-              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition lg:block ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
-            >
-              Bài đăng của tôi
-            </Link>
-            <Link
-              to="/inbox"
-              className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
-            >
-              Tin nhắn
+      {!isAdminRoute && (
+        <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex h-[4.5rem] max-w-6xl items-center justify-between gap-4 px-4">
+            {/* Logo */}
+            <Link to="/" className="flex min-w-0 items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8f171d] text-lg font-bold text-white shadow-sm">
+                F
+              </div>
+              <span className="truncate text-base font-bold tracking-tight text-[#8f171d] sm:text-lg">
+                FTU Lost & Found
+              </span>
             </Link>
 
-            {/* Nút Đăng tin (Chỉ nổi bật) */}
-            <Link
-              to="/dang-tin"
-              className="flex items-center gap-1 rounded-lg bg-[#8f171d] px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#741219] sm:px-4"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* Navigation */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Link
+                to="/"
+                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                ></path>
-              </svg>
-              Đăng tin
-            </Link>
+                Trang chủ
+              </Link>
+              <Link
+                to="/tim-kiem"
+                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/tim-kiem" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+              >
+                Tìm kiếm
+              </Link>
+              <Link
+                to="/bai-dang-cua-toi"
+                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition lg:block ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+              >
+                Bài đăng của tôi
+              </Link>
+              <Link
+                to="/inbox"
+                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+              >
+                Tin nhắn
+              </Link>
 
-            {/* Logic hiển thị nút Đăng nhập / Đăng xuất */}
-            {session ? (
-              <div className="ml-1 flex items-center gap-3 border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
-                <span
-                  className="hidden max-w-32 truncate text-sm text-slate-600 md:block"
-                  title={session.user.email}
+              {/* Nút Đăng tin (Chỉ nổi bật) */}
+              <Link
+                to="/dang-tin"
+                className="flex items-center gap-1 rounded-lg bg-[#8f171d] px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#741219] sm:px-4"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  {displayName}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="text-xs font-bold text-slate-500 transition hover:text-red-700 sm:text-sm"
-                >
-                  Đăng xuất
-                </button>
-              </div>
-            ) : (
-              <div className="ml-1 border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 4v16m8-8H4"
+                  ></path>
+                </svg>
+                Đăng tin
+              </Link>
+
+              {isAdmin && (
                 <Link
-                  to="/login"
-                  className="text-xs font-bold text-slate-600 transition hover:text-red-800 sm:text-sm"
+                  to="/admin"
+                  className="hidden rounded-lg border border-[#8f171d] px-3 py-2 text-sm font-bold text-[#8f171d] transition hover:bg-red-50 sm:block"
                 >
-                  Đăng nhập
+                  Trang quản trị viên
                 </Link>
-              </div>
-            )}
+              )}
+
+              {/* Logic hiển thị nút Đăng nhập / Đăng xuất */}
+              {session ? (
+                <div className="ml-1 flex items-center gap-3 border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
+                  <span
+                    className="hidden max-w-32 truncate text-sm text-slate-600 md:block"
+                    title={session.user.email}
+                  >
+                    {displayName}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs font-bold text-slate-500 transition hover:text-red-700 sm:text-sm"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              ) : (
+                <div className="ml-1 border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
+                  <Link
+                    to="/login"
+                    className="text-xs font-bold text-slate-600 transition hover:text-red-800 sm:text-sm"
+                  >
+                    Đăng nhập
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Content */}
       <main className="flex-grow">
@@ -148,20 +193,31 @@ function App() {
           <Route element={<Inbox />} path="/inbox" />
           <Route path="/dang-tin" element={<CreateItem />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
+
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminStats />} />
+            <Route path="posts" element={<AdminPosts />} />
+            <Route path="items" element={<AdminItems />} />
+            <Route path="inbox" element={<AdminInbox />} />
+            <Route path="stats" element={<AdminStats />} />
+          </Route>
         </Routes>
       </main>
 
       {/* Footer (Thêm cho giống thật) */}
-      <footer className="mt-auto border-t border-slate-200 bg-white py-8">
-        <div className="mx-auto max-w-7xl px-4 text-center">
-          <p className="mb-3 text-sm text-slate-500">
-            Nền tảng tìm đồ thất lạc dành riêng cho cộng đồng Ngoại thương.
-          </p>
-          <div className="text-xs text-slate-400">
-            © 2026 Bản quyền thuộc về dự án FTU Lost & Found.
+      {!isAdminRoute && (
+        <footer className="mt-auto border-t border-slate-200 bg-white py-8">
+          <div className="mx-auto max-w-7xl px-4 text-center">
+            <p className="mb-3 text-sm text-slate-500">
+              Nền tảng tìm đồ thất lạc dành riêng cho cộng đồng Ngoại thương.
+            </p>
+            <div className="text-xs text-slate-400">
+              © 2026 Bản quyền thuộc về dự án FTU Lost & Found.
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }
