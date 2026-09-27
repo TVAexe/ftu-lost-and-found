@@ -6,6 +6,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Menu, X } from "lucide-react";
 import { supabase } from "./config/supabaseClient";
 import CreateItem from "./pages/CreateItem";
 import Home from "./pages/Home";
@@ -26,7 +27,12 @@ function App() {
   const location = useLocation();
   const [session, setSession] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin");
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const loadAdminStatus = async (nextSession) => {
     if (!nextSession?.user) {
@@ -84,11 +90,15 @@ function App() {
       {/* Header */}
       {!isAdminRoute && (
         <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
-          <div className="mx-auto flex h-[4.5rem] max-w-6xl items-center justify-between gap-4 px-4">
+          <div className="mx-auto flex h-[4.5rem] max-w-6xl items-center justify-between gap-2 px-4">
             {/* Logo */}
             <Link to="/" className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8f171d] text-lg font-bold text-white shadow-sm">
-                F
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#8f171d] shadow-sm">
+                <img
+                  src="/FTU-logo.png"
+                  alt="FTU Lost & Found"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <span className="truncate text-base font-bold tracking-tight text-[#8f171d] sm:text-lg">
                 FTU Lost & Found
@@ -96,28 +106,28 @@ function App() {
             </Link>
 
             {/* Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="hidden items-center gap-1 sm:flex sm:gap-2">
               <Link
                 to="/"
-                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+                className={`hidden whitespace-nowrap rounded-lg  py-2 text-sm font-semibold transition sm:block ${location.pathname === "/" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
               >
                 Trang chủ
               </Link>
               <Link
                 to="/tim-kiem"
-                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/tim-kiem" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+                className={`hidden whitespace-nowrap rounded-lg px-2 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/tim-kiem" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
               >
                 Tìm kiếm
               </Link>
               <Link
                 to="/bai-dang-cua-toi"
-                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition lg:block ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+                className={`hidden whitespace-nowrap rounded-lg px-2 py-2 text-sm font-semibold transition lg:block ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
               >
                 Bài đăng của tôi
               </Link>
               <Link
                 to="/inbox"
-                className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
+                className={`hidden whitespace-nowrap rounded-lg px-2 py-2 text-sm font-semibold transition sm:block ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#8f171d]"}`}
               >
                 Tin nhắn
               </Link>
@@ -125,7 +135,7 @@ function App() {
               {/* Nút Đăng tin (Chỉ nổi bật) */}
               <Link
                 to="/dang-tin"
-                className="flex items-center gap-1 rounded-lg bg-[#8f171d] px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#741219] sm:px-4"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-[#8f171d] px-2 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#741219] sm:px-4"
               >
                 <svg
                   className="w-4 h-4"
@@ -146,7 +156,7 @@ function App() {
               {isAdmin && (
                 <Link
                   to="/admin"
-                  className="hidden rounded-lg border border-[#8f171d] px-3 py-2 text-sm font-bold text-[#8f171d] transition hover:bg-red-50 sm:block"
+                  className="hidden shrink-0 whitespace-nowrap rounded-lg border border-[#8f171d] px-2 py-2 text-sm font-bold text-[#8f171d] transition hover:bg-red-50 sm:block"
                 >
                   Trang quản trị viên
                 </Link>
@@ -154,7 +164,7 @@ function App() {
 
               {/* Logic hiển thị nút Đăng nhập / Đăng xuất */}
               {session ? (
-                <div className="ml-1 flex items-center gap-3 border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
+                <div className="ml-1 flex shrink-0 items-center gap-3 whitespace-nowrap border-l border-slate-200 pl-3 sm:ml-2 sm:pl-4">
                   <span
                     className="hidden max-w-32 truncate text-sm text-slate-600 md:block"
                     title={session.user.email}
@@ -179,7 +189,78 @@ function App() {
                 </div>
               )}
             </div>
+
+            <button
+              type="button"
+              aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
+              aria-expanded={isMobileMenuOpen}
+              onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#8f171d] transition hover:bg-red-50 sm:hidden"
+            >
+              {isMobileMenuOpen ? <X size={23} /> : <Menu size={23} />}
+            </button>
           </div>
+
+          {isMobileMenuOpen && (
+            <nav className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 sm:hidden">
+              <div className="flex flex-col gap-1">
+                <Link
+                  to="/"
+                  className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${location.pathname === "/" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Trang chủ
+                </Link>
+                <Link
+                  to="/tim-kiem"
+                  className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${location.pathname === "/tim-kiem" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Tìm kiếm
+                </Link>
+                <Link
+                  to="/bai-dang-cua-toi"
+                  className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${location.pathname === "/bai-dang-cua-toi" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Bài đăng của tôi
+                </Link>
+                <Link
+                  to="/inbox"
+                  className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${location.pathname === "/inbox" ? "bg-red-50 text-[#8f171d]" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Tin nhắn
+                </Link>
+                <Link
+                  to="/dang-tin"
+                  className="rounded-lg px-3 py-2.5 text-sm font-semibold text-[#8f171d] hover:bg-red-50"
+                >
+                  Đăng tin
+                </Link>
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    className="rounded-lg px-3 py-2.5 text-sm font-semibold text-[#8f171d] hover:bg-red-50"
+                  >
+                    Trang quản trị viên
+                  </Link>
+                )}
+                {session ? (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="border-t border-slate-100 px-3 pt-3 text-left text-sm font-bold text-slate-500"
+                  >
+                    Đăng xuất
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="border-t border-slate-100 px-3 pt-3 text-sm font-bold text-slate-600"
+                  >
+                    Đăng nhập
+                  </Link>
+                )}
+              </div>
+            </nav>
+          )}
         </header>
       )}
 
@@ -210,7 +291,7 @@ function App() {
         <footer className="mt-auto border-t border-slate-200 bg-white py-8">
           <div className="mx-auto max-w-7xl px-4 text-center">
             <p className="mb-3 text-sm text-slate-500">
-              Nền tảng tìm đồ thất lạc dành riêng cho cộng đồng Ngoại thương.
+              Nền tảng tìm đồ thất lạc dành cho cộng đồng Ngoại thương.
             </p>
             <div className="text-xs text-slate-400">
               © 2026 Bản quyền thuộc về dự án FTU Lost & Found.

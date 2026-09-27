@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../config/supabaseClient";
 import ItemCard from "../components/ItemCard";
 
+const PAGE_SIZE = 8;
+
 const normalizeText = (value = "") =>
   value
     .normalize("NFD")
@@ -14,7 +16,9 @@ export default function Home() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Tất cả");
+  const [category, setCategory] = useState("Tất cả");
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
 
   const fetchItems = async (search = searchTerm) => {
     setLoading(true);
@@ -22,11 +26,14 @@ export default function Home() {
       .from("items")
       .select("*")
       .order("created_at", { ascending: false })
-      .eq('approval_status', 'approved') // Chỉ hiện bài đã duyệt
-      .neq('status', 'Đã trao trả') // Ẩn các bài đã trao trả[cite: 3, 4];
+      .eq("approval_status", "approved") // Chỉ hiện bài đã duyệt
+      .neq("status", "Đã trao trả"); // Ẩn các bài đã trao trả[cite: 3, 4];
 
     if (filter !== "Tất cả") {
       query = query.eq("type", filter);
+    }
+    if (category !== "Tất cả") {
+      query = query.eq("category", category);
     }
 
     const { data, error } = await query;
@@ -48,7 +55,18 @@ export default function Home() {
 
   useEffect(() => {
     fetchItems();
-  }, [filter]);
+  }, [category, filter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category, filter, searchTerm]);
+
+  const categoryOptions = [
+    "Tất cả",
+    ...new Set(items.map((item) => item.category?.trim()).filter(Boolean)),
+  ];
+  const totalPages = Math.ceil(items.length / PAGE_SIZE);
+  const visibleItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -58,49 +76,41 @@ export default function Home() {
   return (
     <div className="bg-[#f7f8fa] pb-14">
       {/* Banner */}
-      <div
-        className="relative flex min-h-[20rem] w-full items-center justify-center bg-[#7f1118] bg-cover bg-center text-white"
-        // style={{
-        //   backgroundImage: `linear-gradient(90deg, rgba(80, 8, 14, .88), rgba(127, 17, 24, .48)), url("${import.meta.env.BASE_URL}banner-ftu.jpeg")`,
-        // }}
-      >
-        <div className="relative z-10 w-full max-w-3xl px-5 text-center sm:px-8">
-          <h1 className="text-4xl font-bold tracking-tight drop-shadow-sm sm:text-5xl">
-            FTU Lost & Found
-          </h1>
-          <p className="mt-3 text-xl font-semibold text-red-50 sm:text-2xl">
-            Kết nối - Tìm lại - Trao gửi
-          </p>
-          <p className="mx-auto mb-8 mt-3 max-w-xl text-sm text-red-100 sm:text-base">
-            Nền tảng tìm đồ thất lạc dành riêng cho sinh viên FTU
-          </p>
+      <div className="h-64 w-full overflow-hidden bg-slate-100 sm:h-80">
+        <img
+          src={`${import.meta.env.BASE_URL}banner.jpeg`}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
 
-          <form
-            onSubmit={handleSearch}
-            className="mx-auto flex min-h-14 max-w-2xl overflow-hidden rounded-xl bg-white p-1.5 shadow-2xl"
+      {/* Tìm kiếm */}
+      <div className="border-b border-slate-200 bg-white px-4 py-5">
+        <form
+          onSubmit={handleSearch}
+          className="mx-auto flex min-h-14 max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm"
+        >
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Tìm kiếm tên món đồ, địa điểm..."
+            className="min-w-0 flex-grow rounded-lg px-4 text-sm text-gray-800 outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-[#a51d24] px-5 text-sm font-bold text-white transition hover:bg-[#781219] sm:px-7"
           >
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Tìm kiếm tên món đồ, địa điểm..."
-              className="min-w-0 flex-grow rounded-lg px-4 text-sm text-gray-800 outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-[#a51d24] px-5 text-sm font-bold transition hover:bg-[#781219] sm:px-7"
-            >
-              Tìm kiếm
-            </button>
-          </form>
-        </div>
+            Tìm kiếm
+          </button>
+        </form>
       </div>
 
       <div className="mx-auto max-w-6xl px-4 pt-10">
         {/* Bộ lọc */}
         <div className="mb-7 flex flex-col justify-between gap-5 border-b border-slate-200 pb-5 sm:flex-row sm:items-end">
           <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-red-700">
+            <p className="mb-1 text-2xl font-bold tracking-tight text-red-700">
               Khám phá bài đăng
             </p>
             <h2 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">
@@ -136,9 +146,33 @@ export default function Home() {
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
+          </div>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((currentPage) => currentPage - 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Trước
+            </button>
+            <span className="text-sm font-semibold text-slate-500">
+              Trang {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage((currentPage) => currentPage + 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sau
+            </button>
           </div>
         )}
       </div>

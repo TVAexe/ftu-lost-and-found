@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 export default function ItemCard({ item }) {
   const isLost = item.type === "Bị mất";
 
+  // Hàm thiết lập màu sắc tương ứng với luồng trạng thái mới
+  const getStatusStyle = (status) => {
+    if (status === "Đã trao trả" || status === "Đã tìm thấy")
+      return "bg-emerald-100 text-emerald-700";
+    if (status === "Đang xác minh") return "bg-blue-100 text-blue-700";
+    if (status === "Đã xác nhận chủ") return "bg-indigo-100 text-indigo-700";
+    return "bg-yellow-100 text-yellow-700"; // Mặc định: Đang tìm
+  };
+
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-red-100 hover:shadow-xl">
       {/* Khung ảnh */}
@@ -18,12 +27,20 @@ export default function ItemCard({ item }) {
             Không có ảnh
           </div>
         )}
-        {/* Nhãn tag */}
-        <span
-          className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-bold shadow-sm ${isLost ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}
-        >
-          {item.type}
-        </span>
+
+        <div className="absolute inset-x-3 top-3 flex flex-wrap gap-1.5">
+          <span
+            className={`max-w-full rounded-full px-3 py-1 text-xs font-bold shadow-sm ${isLost ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}
+          >
+            {item.type}
+          </span>
+
+          <span
+            className={`max-w-full rounded-full px-3 py-1 text-xs font-bold shadow-sm ${getStatusStyle(item.status)}`}
+          >
+            {item.status || "Đang tìm"}
+          </span>
+        </div>
       </div>
 
       {/* Nội dung */}

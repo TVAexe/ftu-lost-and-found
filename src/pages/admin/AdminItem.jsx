@@ -33,8 +33,8 @@ export default function AdminItems() {
   }, []);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <h2 className="text-2xl font-bold mb-2 text-gray-800">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+      <h2 className="mb-2 text-xl font-bold text-gray-800 sm:text-2xl">
         Quản lý kho đồ & Cập nhật trạng thái
       </h2>
       <p className="text-sm text-gray-500 mb-6">

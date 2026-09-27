@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "../config/supabaseClient";
 import ItemCard from "../components/ItemCard";
 
+const PAGE_SIZE = 8;
+
 const normalizeText = (value = "") =>
   value
     .normalize("NFD")
@@ -12,7 +14,6 @@ const normalizeText = (value = "") =>
 
 const filterOptions = {
   type: ["Tất cả", "Bị mất", "Nhặt được"],
-  category: ["Tất cả", "Giấy tờ", "Điện tử", "Khác"],
   date: ["Mọi thời gian", "24 giờ qua", "7 ngày qua", "30 ngày qua"],
 };
 
@@ -43,8 +44,31 @@ export default function Search() {
   const [location, setLocation] = useState("");
   const [type, setType] = useState("Tất cả");
   const [category, setCategory] = useState("Tất cả");
+  const [categoryOptions, setCategoryOptions] = useState(["Tất cả"]);
   const [dateRange, setDateRange] = useState("Mọi thời gian");
   const [sortBy, setSortBy] = useState("newest");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("items")
+        .select("category")
+        .not("category", "is", null);
+
+      if (error) {
+        console.error("Lỗi tải danh mục:", error);
+        return;
+      }
+
+      const categories = [
+        ...new Set(data.map((item) => item.category?.trim()).filter(Boolean)),
+      ];
+      setCategoryOptions(["Tất cả", ...categories]);
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -94,6 +118,13 @@ export default function Search() {
     fetchItems();
   }, [category, dateRange, location, searchTerm, sortBy, type]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [category, dateRange, location, searchTerm, sortBy, type]);
+
+  const totalPages = Math.ceil(items.length / PAGE_SIZE);
+  const visibleItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleSearch = (event) => {
     event.preventDefault();
     const nextParams = new URLSearchParams(searchParams);
@@ -114,42 +145,34 @@ export default function Search() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-[#f7f8fa] pb-14">
-      <section className="border-b border-red-950/10 bg-[#8f171d] px-4 py-10 text-white sm:py-14">
-        <div className="mx-auto max-w-6xl">
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-red-100">
-            FTU Lost & Found
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Tìm kiếm đồ thất lạc
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-red-100 sm:text-base">
-            Tìm lại món đồ của bạn trong cộng đồng Ngoại thương.
-          </p>
+      <div className="h-64 w-full overflow-hidden bg-slate-100 sm:h-80">
+        <img
+          src={`${import.meta.env.BASE_URL}banner.jpeg`}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
 
-          <form
-            onSubmit={handleSearch}
-            className="mt-7 flex max-w-4xl flex-col gap-2 rounded-xl bg-white p-2 shadow-xl sm:flex-row"
+      <div className="border-b border-slate-200 bg-white px-4 py-5">
+        <form
+          onSubmit={handleSearch}
+          className="mx-auto flex min-h-14 max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm"
+        >
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Nhập tên món đồ, ví dụ: Ví da, AirPods..."
+            className="min-w-0 flex-grow rounded-lg px-4 text-sm text-gray-800 outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-[#a51d24] px-5 text-sm font-bold text-white transition hover:bg-[#781219] sm:px-7"
           >
-            <div className="flex min-h-12 flex-1 items-center gap-3 px-3 text-slate-400">
-              <span aria-hidden="true" className="text-lg">
-                ⌕
-              </span>
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Nhập tên món đồ, ví dụ: Ví da, AirPods..."
-                className="w-full bg-transparent text-sm text-slate-800 outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              className="min-h-12 rounded-lg bg-[#a51d24] px-7 text-sm font-bold text-white transition hover:bg-[#781219]"
-            >
-              Tìm kiếm
-            </button>
-          </form>
-        </div>
-      </section>
+            Tìm kiếm
+          </button>
+        </form>
+      </div>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -173,7 +196,7 @@ export default function Search() {
             <FilterSelect
               label="Danh mục"
               value={category}
-              options={filterOptions.category}
+              options={categoryOptions}
               onChange={setCategory}
             />
             <FilterSelect
@@ -237,9 +260,33 @@ export default function Search() {
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
+          </div>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((currentPage) => currentPage - 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Trước
+            </button>
+            <span className="text-sm font-semibold text-slate-500">
+              Trang {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage((currentPage) => currentPage + 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sau
+            </button>
           </div>
         )}
       </main>

@@ -7,30 +7,33 @@ export default function AdminInbox() {
   const [activeContact, setActiveContact] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null); // Quản lý trạng thái Reply
 
-  const messagesEndRef = useRef(null); // Dùng để auto-scroll xuống tin nhắn mới nhất
+  const messagesEndRef = useRef(null);
+
+  // Lấy danh sách hội thoại và map với bảng users để lấy full_name
   const fetchConversations = async (adminEmail) => {
-    const { data, error } = await supabase
+    const { data: messagesData, error: messagesError } = await supabase
       .from("messages")
       .select("*")
       .or(`sender_email.eq.${adminEmail},receiver_email.eq.${adminEmail}`)
       .order("created_at", { ascending: false });
 
-    if (data && !error) {
+    if (messagesData && !messagesError) {
       const convosMap = new Map();
+      const uniqueEmails = new Set();
 
-      data.forEach((msg) => {
-        // Xác định ai là người đang chat với admin
+      messagesData.forEach((msg) => {
         const otherEmail =
           msg.sender_email === adminEmail
             ? msg.receiver_email
             : msg.sender_email;
+        uniqueEmails.add(otherEmail);
 
-        // Chỉ lưu tin nhắn đầu tiên gặp (tin nhắn mới nhất) của mỗi người
         if (!convosMap.has(otherEmail)) {
           convosMap.set(otherEmail, {
             email: otherEmail,
-            name: otherEmail.split("@")[0], // Lấy phần trước @ làm tên tạm
+            name: otherEmail.split("@")[0], // Fallback name
             lastMessage: msg.content,
             created_at: msg.created_at,
             isUnread: false,
@@ -38,11 +41,27 @@ export default function AdminInbox() {
         }
       });
 
+      // Truy vấn bảng users để lấy full_name
+      if (uniqueEmails.size > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("email, full_name")
+          .in("email", Array.from(uniqueEmails));
+
+        if (usersData && !usersError) {
+          usersData.forEach((user) => {
+            if (convosMap.has(user.email) && user.full_name) {
+              const convoInfo = convosMap.get(user.email);
+              convoInfo.name = user.full_name;
+            }
+          });
+        }
+      }
+
       setConversations(Array.from(convosMap.values()));
     }
   };
 
-  // 1. Khởi tạo: Lấy thông tin user hiện tại và load danh sách hội thoại
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -52,9 +71,6 @@ export default function AdminInbox() {
     });
   }, []);
 
-  // Hàm tự động gom nhóm tin nhắn để tạo list hội thoại bên trái
-
-  // 2. Load lịch sử chat chi tiết khi chọn 1 người ở cột trái
   const fetchChatMessages = async (contactEmail, userEmail) => {
     const { data } = await supabase
       .from("messages")
@@ -80,12 +96,10 @@ export default function AdminInbox() {
     };
   }, [activeContact, currentUser]);
 
-  // 3. Auto-scroll xuống cuối khi có tin nhắn mới
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // 4. Lắng nghe Realtime từ Supabase (Có người nhắn là nổi lên ngay)
   useEffect(() => {
     if (!currentUser) return;
 
@@ -97,7 +111,6 @@ export default function AdminInbox() {
         (payload) => {
           const newMessage = payload.new;
 
-          // Nếu tin nhắn mới thuộc về cuộc trò chuyện đang mở -> Thêm vào khung chat
           if (
             activeContact &&
             ((newMessage.sender_email === activeContact.email &&
@@ -108,7 +121,6 @@ export default function AdminInbox() {
             setChatMessages((prev) => [...prev, newMessage]);
           }
 
-          // Cập nhật lại list hội thoại bên trái để hiển thị lastMessage mới
           fetchConversations(currentUser.email);
         },
       )
@@ -119,7 +131,6 @@ export default function AdminInbox() {
     };
   }, [currentUser, activeContact]);
 
-  // 5. Xử lý Gửi tin nhắn
   const handleSendReply = async (e) => {
     e.preventDefault();
     if (!replyText.trim() || !activeContact || !currentUser) return;
@@ -128,18 +139,20 @@ export default function AdminInbox() {
       sender_email: currentUser.email,
       receiver_email: activeContact.email,
       content: replyText.trim(),
+      reply_to_id: replyingTo ? replyingTo.id : null, // Gắn ID tin nhắn được reply
     };
 
-    setReplyText(""); // Xóa khung nhập ngay cho mượt
+    setReplyText("");
+    setReplyingTo(null);
 
     const { error } = await supabase.from("messages").insert([newMsgObj]);
     if (error) console.error("Lỗi gửi tin nhắn:", error);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-[80vh] flex overflow-hidden">
+    <div className="flex h-[80vh] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:flex-row">
       {/* Cột trái: Danh sách hội thoại */}
-      <div className="w-1/3 border-r border-gray-200 flex flex-col bg-white">
+      <div className="flex h-2/5 w-full flex-col border-b border-gray-200 bg-white md:h-auto md:w-1/3 md:border-b-0 md:border-r">
         <div className="p-4 border-b font-bold text-gray-800 bg-gray-50 flex items-center justify-between">
           <span>Hộp thư Inbox</span>
           <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
@@ -171,7 +184,7 @@ export default function AdminInbox() {
       </div>
 
       {/* Cột phải: Khung chat chi tiết */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="min-h-0 flex-1 flex flex-col bg-gray-50">
         {activeContact ? (
           <>
             <div className="p-4 border-b bg-white font-semibold text-gray-800 shadow-sm flex items-center gap-3">
@@ -194,43 +207,148 @@ export default function AdminInbox() {
               ) : (
                 chatMessages.map((m) => {
                   const isAdminSending = m.sender_email === currentUser?.email;
+                  const repliedMsg = m.reply_to_id
+                    ? chatMessages.find((msg) => msg.id === m.reply_to_id)
+                    : null;
+
                   return (
                     <div
                       key={m.id}
-                      className={`flex ${isAdminSending ? "justify-end" : "justify-start"}`}
+                      className={`flex ${isAdminSending ? "justify-end" : "justify-start"} group relative items-center`}
                     >
-                      <div
-                        className={`p-3 rounded-xl text-sm max-w-[70%] shadow-sm ${isAdminSending ? "bg-red-800 text-white rounded-br-none" : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"}`}
-                      >
-                        {m.content}
+                      {/* Nút Reply - Cho tin nhắn của khách */}
+                      {!isAdminSending && (
+                        <button
+                          onClick={() => setReplyingTo(m)}
+                          className="opacity-0 group-hover:opacity-100 transition-all p-2 mx-2 rounded-full hover:bg-gray-200 text-gray-400 flex-shrink-0"
+                          title="Trả lời"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                            ></path>
+                          </svg>
+                        </button>
+                      )}
+
+                      <div className="flex flex-col max-w-[70%]">
+                        {/* Khối trích dẫn (Reply) */}
+                        {repliedMsg && (
+                          <div
+                            className={`mb-1 p-2 rounded-lg text-xs opacity-75 border-l-2 ${isAdminSending ? "bg-red-900/20 border-white text-white" : "bg-gray-200 border-gray-400 text-gray-600"}`}
+                          >
+                            <span className="font-bold block mb-1">
+                              {repliedMsg.sender_email === currentUser.email
+                                ? "Quản trị viên"
+                                : activeContact.name}
+                            </span>
+                            <span className="truncate block">
+                              {repliedMsg.content}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Nội dung tin nhắn chính */}
+                        <div
+                          className={`p-3 rounded-xl text-sm shadow-sm ${isAdminSending ? "bg-red-800 text-white rounded-br-none" : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"}`}
+                        >
+                          {m.content}
+                        </div>
                       </div>
+
+                      {/* Nút Reply - Cho tin nhắn của admin */}
+                      {isAdminSending && (
+                        <button
+                          onClick={() => setReplyingTo(m)}
+                          className="opacity-0 group-hover:opacity-100 transition-all p-2 mx-2 rounded-full hover:bg-gray-200 text-gray-400 flex-shrink-0"
+                          title="Trả lời"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                            ></path>
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })
               )}
-              {/* Thẻ div rỗng để auto-scroll focus vào cuối */}
               <div ref={messagesEndRef} />
             </div>
 
-            <form
-              onSubmit={handleSendReply}
-              className="p-3 bg-white border-t flex gap-2 items-center"
-            >
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Nhập tin nhắn..."
-                className="flex-1 border border-gray-300 rounded-full px-5 py-2.5 text-sm outline-none focus:border-red-800 transition shadow-inner"
-              />
-              <button
-                type="submit"
-                disabled={!replyText.trim()}
-                className="bg-red-800 text-white px-6 py-2.5 rounded-full text-sm font-bold hover:bg-red-900 transition disabled:opacity-50"
+            <div className="bg-white border-t border-gray-200 flex flex-col">
+              {/* Thanh báo đang trả lời */}
+              {replyingTo && (
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex justify-between items-center text-sm">
+                  <div className="flex flex-col overflow-hidden pr-2">
+                    <span className="font-semibold text-gray-700 text-xs">
+                      Đang trả lời{" "}
+                      {replyingTo.sender_email === currentUser.email
+                        ? "chính bạn"
+                        : activeContact.name}
+                    </span>
+                    <span className="text-gray-500 truncate">
+                      {replyingTo.content}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="p-1 text-gray-400 hover:text-red-500 transition"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      ></path>
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSendReply}
+                className="p-3 flex gap-2 items-center"
               >
-                Gửi
-              </button>
-            </form>
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Nhập câu trả lời..."
+                  className="flex-1 border border-gray-300 rounded-full px-5 py-2.5 text-sm outline-none focus:border-red-800 transition shadow-inner"
+                />
+                <button
+                  type="submit"
+                  disabled={!replyText.trim()}
+                  className="bg-red-800 text-white px-6 py-2.5 rounded-full text-sm font-bold hover:bg-red-900 transition disabled:opacity-50"
+                >
+                  Gửi
+                </button>
+              </form>
+            </div>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400">

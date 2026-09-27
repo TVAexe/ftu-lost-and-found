@@ -9,7 +9,7 @@ export default function Inbox() {
   const { showPopup } = usePopup();
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Danh sách những người đã nhắn tin
+  // Danh sách những người đã nhắn tin (giờ lưu mảng object chứa cả name và email)
   const [contacts, setContacts] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
 
@@ -49,21 +49,48 @@ export default function Inbox() {
     }, 100);
   };
 
+  // HÀM MỚI: Truy vấn kết hợp lấy tên từ bảng users
   const fetchContacts = async (myEmail) => {
-    const { data, error } = await supabase
+    const { data: messagesData, error: messagesError } = await supabase
       .from("messages")
       .select("*")
       .or(`sender_email.eq.${myEmail},receiver_email.eq.${myEmail}`)
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
+    if (!messagesError && messagesData) {
+      const convosMap = new Map();
       const uniqueEmails = new Set();
-      data.forEach((msg) => {
+
+      // Lọc email duy nhất
+      messagesData.forEach((msg) => {
         const contactEmail =
           msg.sender_email === myEmail ? msg.receiver_email : msg.sender_email;
         uniqueEmails.add(contactEmail);
+
+        if (!convosMap.has(contactEmail)) {
+          convosMap.set(contactEmail, {
+            email: contactEmail,
+            name: contactEmail.split("@")[0], // Tên dự phòng (fallback) nếu user không có tên
+          });
+        }
       });
-      setContacts(Array.from(uniqueEmails));
+
+      // Truy vấn bảng users để lấy full_name
+      if (uniqueEmails.size > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("email, full_name")
+          .in("email", Array.from(uniqueEmails));
+
+        if (!usersError && usersData) {
+          usersData.forEach((user) => {
+            if (convosMap.has(user.email) && user.full_name) {
+              convosMap.get(user.email).name = user.full_name;
+            }
+          });
+        }
+      }
+      setContacts(Array.from(convosMap.values()));
     }
   };
 
@@ -129,17 +156,16 @@ export default function Inbox() {
       sender_email: currentUser.email,
       receiver_email: activeContact,
       content: inputText.trim(),
-      reply_to_id: replyingTo ? replyingTo.id : null, // Gắn ID tin nhắn gốc
+      reply_to_id: replyingTo ? replyingTo.id : null, 
     };
 
     setInputText("");
-    setReplyingTo(null); // Xóa state reply sau khi gửi
+    setReplyingTo(null); 
 
     const { error } = await supabase.from("messages").insert([newMsg]);
     if (error) showPopup("Lỗi gửi tin: " + error.message, "error");
   };
 
-  // --- Xử lý sự kiện vuốt (Swipe) ---
   const handleTouchStart = (e, msgId) => {
     touchStartRef.current = e.targetTouches[0].clientX;
     setSwipeState({ id: msgId, offset: 0 });
@@ -150,7 +176,6 @@ export default function Inbox() {
     const currentX = e.targetTouches[0].clientX;
     const diff = currentX - touchStartRef.current;
     
-    // Giới hạn chỉ cho phép vuốt sang phải tối đa 60px
     if (diff > 0 && diff <= 60) {
       setSwipeState({ id: msgId, offset: diff });
     }
@@ -165,10 +190,16 @@ export default function Inbox() {
 
   if (!currentUser) return null;
 
+  // Lấy thông tin user đang chat (để hiển thị tên trên thanh header)
+  const activeContactObj = contacts.find(c => c.email === activeContact) || { 
+    email: activeContact, 
+    name: activeContact ? activeContact.split("@")[0] : "" 
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-4 h-[calc(100vh-100px)] flex">
-      {/* Khung bên ngoài */}
       <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm flex overflow-hidden">
+        
         {/* Cột trái: Sidebar */}
         <div className="hidden md:flex w-1/3 border-r border-gray-200 flex-col bg-white">
           <div className="p-4 border-b border-gray-100">
@@ -183,17 +214,18 @@ export default function Inbox() {
             {contacts.length === 0 ? (
               <p className="text-center text-sm text-gray-400 mt-10">Chưa có cuộc trò chuyện nào</p>
             ) : (
-              contacts.map((contactEmail) => (
+              contacts.map((contact) => (
                 <div
-                  key={contactEmail}
-                  onClick={() => loadMessages(contactEmail)}
-                  className={`p-4 flex items-center gap-3 cursor-pointer transition ${activeContact === contactEmail ? "bg-red-50 border-l-4 border-red-800" : "hover:bg-gray-50 border-l-4 border-transparent"}`}
+                  key={contact.email}
+                  onClick={() => loadMessages(contact.email)}
+                  className={`p-4 flex items-center gap-3 cursor-pointer transition ${activeContact === contact.email ? "bg-red-50 border-l-4 border-red-800" : "hover:bg-gray-50 border-l-4 border-transparent"}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-gray-300 flex-shrink-0 flex items-center justify-center text-white font-bold">
-                    {contactEmail.charAt(0).toUpperCase()}
+                    {contact.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className={`text-sm font-semibold truncate ${activeContact === contactEmail ? "text-red-900" : "text-gray-900"}`}>{contactEmail.split("@")[0]}</h4>
+                    {/* ĐÃ CẬP NHẬT HIỂN THỊ contact.name TẠI ĐÂY */}
+                    <h4 className={`text-sm font-semibold truncate ${activeContact === contact.email ? "text-red-900" : "text-gray-900"}`}>{contact.name}</h4>
                     <p className="text-xs text-gray-500 truncate">Nhấn để xem tin nhắn</p>
                   </div>
                 </div>
@@ -211,10 +243,11 @@ export default function Inbox() {
                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
               </button>
               <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold">
-                {activeContact.charAt(0).toUpperCase()}
+                {activeContactObj.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h3 className="font-bold text-gray-800">{activeContact.split("@")[0]}</h3>
+                {/* HIỂN THỊ TÊN TRONG HEADER */}
+                <h3 className="font-bold text-gray-800">{activeContactObj.name}</h3>
                 <span className="text-xs text-green-500 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-green-500"></span> Đang online
                 </span>
@@ -226,14 +259,10 @@ export default function Inbox() {
               {messages.map((msg) => {
                 const isMe = msg.sender_email === currentUser.email;
                 const isSwiping = swipeState.id === msg.id;
-                
-                // Tìm tin nhắn gốc nếu có reply_to_id
                 const repliedMsg = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
 
                 return (
                   <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} group relative items-center`}>
-                    
-                    {/* Nút Reply (Desktop) - Cho người khác */}
                     {!isMe && (
                       <button 
                         onClick={() => setReplyingTo(msg)}
@@ -244,12 +273,10 @@ export default function Inbox() {
                       </button>
                     )}
 
-                    {/* Icon mũi tên hiện ra khi vuốt (Mobile) */}
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-400 opacity-0 transition-opacity" style={{ opacity: isSwiping ? swipeState.offset / 40 : 0 }}>
                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                     </div>
 
-                    {/* Khối tin nhắn có thể vuốt */}
                     <div 
                       className="flex flex-col max-w-[75%] transition-transform duration-75 ease-out"
                       style={{ transform: `translateX(${isSwiping ? swipeState.offset : 0}px)` }}
@@ -257,23 +284,21 @@ export default function Inbox() {
                       onTouchMove={(e) => handleTouchMove(e, msg.id)}
                       onTouchEnd={() => handleTouchEnd(msg)}
                     >
-                      {/* Box Trích dẫn */}
                       {repliedMsg && (
                         <div className={`mb-1 p-2 rounded-lg text-xs opacity-75 border-l-2 ${isMe ? "bg-red-900/20 border-white text-white" : "bg-gray-200 border-gray-400 text-gray-600"}`}>
                           <span className="font-bold block mb-1">
-                            {repliedMsg.sender_email === currentUser.email ? "Bạn" : repliedMsg.sender_email.split('@')[0]}
+                            {/* HIỂN THỊ TÊN NGƯỜI ĐƯỢC TRẢ LỜI TRONG BONG BÓNG CHAT */}
+                            {repliedMsg.sender_email === currentUser.email ? "Bạn" : activeContactObj.name}
                           </span>
                           <span className="truncate block">{repliedMsg.content}</span>
                         </div>
                       )}
 
-                      {/* Nội dung tin nhắn chính */}
                       <div className={`p-3 text-sm rounded-2xl ${isMe ? "bg-red-800 text-white rounded-tr-sm" : "bg-gray-100 text-gray-800 rounded-tl-sm"}`}>
                         {msg.content}
                       </div>
                     </div>
 
-                    {/* Nút Reply (Desktop) - Cho chính mình */}
                     {isMe && (
                       <button 
                         onClick={() => setReplyingTo(msg)}
@@ -289,15 +314,12 @@ export default function Inbox() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Vùng nhập liệu */}
             <div className="bg-white border-t border-gray-200 flex flex-col">
-              
-              {/* Thanh báo "Đang trả lời" */}
               {replyingTo && (
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex justify-between items-center text-sm">
                   <div className="flex flex-col overflow-hidden pr-2">
                     <span className="font-semibold text-gray-700 text-xs">
-                      Đang trả lời {replyingTo.sender_email === currentUser.email ? "chính bạn" : replyingTo.sender_email.split('@')[0]}
+                      Đang trả lời {replyingTo.sender_email === currentUser.email ? "chính bạn" : activeContactObj.name}
                     </span>
                     <span className="text-gray-500 truncate">{replyingTo.content}</span>
                   </div>
@@ -307,7 +329,6 @@ export default function Inbox() {
                 </div>
               )}
 
-              {/* Ô Input */}
               <div className="p-3 md:p-4">
                 <form onSubmit={handleSend} className="flex items-center gap-2">
                   <input

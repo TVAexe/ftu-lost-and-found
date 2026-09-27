@@ -3,11 +3,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../config/supabaseClient";
 import ItemCard from "../components/ItemCard";
 
+const PAGE_SIZE = 8;
+
 export default function MyPosts() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
+  const [type, setType] = useState("Tất cả");
+  const [category, setCategory] = useState("Tất cả");
+  const [status, setStatus] = useState("Tất cả");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const fetchMyPosts = async () => {
@@ -40,6 +46,27 @@ export default function MyPosts() {
 
     fetchMyPosts();
   }, []);
+
+  const filteredItems = items.filter((item) => {
+    const matchesType = type === "Tất cả" || item.type === type;
+    const matchesCategory = category === "Tất cả" || item.category === category;
+    const matchesStatus =
+      status === "Tất cả" || (item.status || "Đang tìm") === status;
+    return matchesType && matchesCategory && matchesStatus;
+  });
+  const categoryOptions = [
+    "Tất cả",
+    ...new Set(items.map((item) => item.category?.trim()).filter(Boolean)),
+  ];
+  const statusOptions = [
+    "Tất cả",
+    ...new Set(items.map((item) => item.status || "Đang tìm")),
+  ];
+  const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+  const visibleItems = filteredItems.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   if (!loading && !userEmail) {
     return (
@@ -96,10 +123,57 @@ export default function MyPosts() {
           <h2 className="font-bold text-slate-800">Danh sách bài đăng</h2>
           {!loading && (
             <span className="text-sm text-slate-500">
-              {items.length} bài đăng
+              {filteredItems.length} bài đăng
             </span>
           )}
         </div>
+
+        {!loading && items.length > 0 && (
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <select
+              value={type}
+              onChange={(event) => {
+                setType(event.target.value);
+                setPage(1);
+              }}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-red-700"
+            >
+              {["Tất cả", "Bị mất", "Nhặt được"].map((option) => (
+                <option key={option} value={option}>
+                  Loại: {option}
+                </option>
+              ))}
+            </select>
+            <select
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setPage(1);
+              }}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-red-700"
+            >
+              {categoryOptions.map((option) => (
+                <option key={option} value={option}>
+                  Danh mục: {option}
+                </option>
+              ))}
+            </select>
+            <select
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-red-700"
+            >
+              {statusOptions.map((option) => (
+                <option key={option} value={option}>
+                  Trạng thái: {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {loading ? (
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,13 +184,13 @@ export default function MyPosts() {
               />
             ))}
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
             <p className="font-semibold text-slate-700">
-              Bạn chưa có bài đăng nào
+              Không có bài đăng phù hợp
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              Hãy đăng món đồ đầu tiên để bắt đầu kết nối.
+              Thử thay đổi bộ lọc hoặc đăng món đồ đầu tiên để bắt đầu kết nối.
             </p>
             <Link
               to="/dang-tin"
@@ -127,9 +201,33 @@ export default function MyPosts() {
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
+          </div>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((currentPage) => currentPage - 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Trước
+            </button>
+            <span className="text-sm font-semibold text-slate-500">
+              Trang {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage((currentPage) => currentPage + 1)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sau
+            </button>
           </div>
         )}
       </main>
